@@ -1,6 +1,8 @@
 module MKAbsynCodeGen
 
-include("traversal.jl")
+include("main.jl")
+
+using ..MKAbsynProgramTraversal
 
 
 using MKAbsyn
@@ -10,16 +12,16 @@ using MetaModelica
 using ExportAll
 
 import ListUtil
-import ..System
-import JuliaFormatter
 
-INITIAL_SUB_CLASS_NAME = "context_initial"
+const INITIAL_SUB_CLASS_NAME = "context_initial"
 
 function generateCodeFromMKAbsyn(inProgram::MKAbsyn.Program)::String
 
+    println("a")
     helper = MKAbsynProgramTraverser()
-    helper.reset()
-    helper.translateProgram(inProgram)
+    resetState(helper)
+    a = translateProgram(helper, inProgram)
+    println(a)
     context_dict::Dict{CLASS,List{CONTEXT}} = helper.context_dict
     context_equation_dict::Dict{CLASS,List{CONTEXTEQUATIONSECTION}} = helper.context_equation_dict
 

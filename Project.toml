@@ -4,6 +4,7 @@ authors = ["Manuel Krombholz <manuel_krofficia@online.de>"]
 version = "0.0.1"
 
 [deps]
+ListUtil = "b2a72b7e-c1ef-11e9-3a87-6ddc5900c366"
 ExportAll = "ad2082ca-a69e-11e9-38fa-e96309a31fe4"
 JuliaFormatter = "98e50ef6-434e-11e9-1051-2b60c6c9e899"
 MetaModelica = "9d7f2a79-07b5-5542-8b19-c0100dda6b06"
