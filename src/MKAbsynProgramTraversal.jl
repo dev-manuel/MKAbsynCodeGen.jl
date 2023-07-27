@@ -54,11 +54,22 @@ function bundleElementsFromIterator(iter::Base.Generator)::String
     join(list(iter), "\n")
 end
 
+mutable struct ContextDeclaration
+    label::String
+    condition::List{Exp}
+end
+
+mutable struct ContextEquationSystem
+    contextLabel::String
+    equations::List{EquationItem}
+end
+
+
 
 mutable struct MKAbsynProgramTraverser
 
-    context_dict::Dict{Class,List{Context}}
-    context_equation_dict::Dict{Class,List{ContextEquationSection}}
+    context_dict::Dict{Class,List{ContextDeclaration}}
+    context_equation_dict::Dict{Class,List{ContextEquationSystem}}
 
 end
 
@@ -101,7 +112,7 @@ function translateClass(self::MKAbsynProgramTraverser, inClass::MKAbsyn.Class)::
             body=cBody,
             info=cInfo,
         ) => begin
-            classDef = translateClassDef(self, cBody, cInfo, cRestriction)
+            classDef = translateClassDef(self, cBody, cInfo, cRestriction, inClass)
             restStr = begin
                 @match cRestriction begin
                     MKAbsyn.R_MODEL() => "model"
@@ -118,6 +129,7 @@ function translateClassDef(
     inClassDef::MKAbsyn.ClassDef,
     info::MKAbsyn.SourceInfo,
     re::MKAbsyn.Restriction,
+    inClass::MKAbsyn.Class
 )::String
     local dClassParts::List{MKAbsyn.ClassPart}
     local dComment::Option{String}
@@ -132,9 +144,7 @@ function translateClassDef(
             classParts=dClassParts,
             ann=ann,
             comment=cmtString,
-        ) => begin
-            bundleElementsFromIterator(translateClassPart(self, c) for c in dClassParts)
-        end
+        ) => bundleElementsFromIterator(translateClassPart(self, c, inClass) for c in dClassParts)
         #TODO: OTHERS 
     end
 
@@ -142,23 +152,40 @@ end
 
 
 
-function translateClassPart(self::MKAbsynProgramTraverser, inClassPart::MKAbsyn.ClassPart)::String
+function translateClassPart(self::MKAbsynProgramTraverser, inClassPart::MKAbsyn.ClassPart, inClass::MKAbsyn.Class)::String
     local cEquationContents::List{EquationItem}
     local cElementContents::List{ElementItem}
 
     @match inClassPart begin
         MKAbsyn.EQUATIONS(
             contents=cEquationContents
-        ) => begin
-            "equation\n" + bundleElementsFromIterator(translateEquationItem(self, c) for c in cEquationContents)
-        end
+        ) => "equation\n" + bundleElementsFromIterator(translateEquationItem(self, c) for c in cEquationContents)
         MKAbsyn.PUBLIC(
             contents=cElementContents
-        ) => begin
-            bundleElementsFromIterator(translateElementItem(self, c) for c in cElementContents)
-        end
+        ) => bundleElementsFromIterator(translateElementItem(self, c) for c in cElementContents)
+        MKAbsyn.PUBLIC(
+            contents=cElementContents
+        ) => bundleElementsFromIterator(translateElementItem(self, c) for c in cElementContents)
+        MKAbsyn.CONTEXTEQUATIONS(
+            label=cLabel,
+            contents=cEquationContents
+        ) => translateContextEquations(self, cLabel, cEquationContents, inClass)
+
         #TODO: OTHERS 
     end
+end
+
+function translateContextEquations(self::MKAbsynProgramTraverser, label::String, contents::List{EquationItem}, inClass::MKAbsyn.Class)::String
+    # check if inClass already in dict
+    println("got you")
+    if haskey(self.context_equation_dict, inClass)
+        # append to list
+        self.context_equation_dict[inClass] = self.context_equation_dict[inClass] + ContextEquationSystem(label, contents)
+    else
+        # create new list
+        self.context_equation_dict[inClass] = [ContextEquationSystem(label, contents)]
+    end
+    ""
 end
 
 function translateEquationItem(self::MKAbsynProgramTraverser, equation::MKAbsyn.EquationItem)::String
@@ -183,6 +210,9 @@ function translateElementItem(self::MKAbsynProgramTraverser, element::MKAbsyn.El
         MKAbsyn.ELEMENTITEM(
             element=eElement
         ) => translateElement(self, eElement)
+        MKAbsyn.LEXER_COMMENT(
+            comment=eComment
+        ) => "//" + eComment
     end
 end
 

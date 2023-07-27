@@ -15,15 +15,16 @@ import ListUtil
 
 const INITIAL_SUB_CLASS_NAME = "context_initial"
 
-function generateCodeFromMKAbsyn(inProgram::MKAbsyn.Program)::String
+function generateCodeFromMKAbsyn(inProgram::MKAbsyn.Program)::Dict{Class,List{ContextEquationSystem}}
 
     println("a")
     helper = MKAbsynProgramTraverser()
     resetState(helper)
     a = translateProgram(helper, inProgram)
     println(a)
-    context_dict::Dict{CLASS,List{CONTEXT}} = helper.context_dict
-    context_equation_dict::Dict{CLASS,List{CONTEXTEQUATIONSECTION}} = helper.context_equation_dict
+    context_dict::Dict{Class,List{ContextDeclaration}} = helper.context_dict
+    context_equation_dict::Dict{Class,List{ContextEquationSystem}} = helper.context_equation_dict
+    return context_equation_dict
 
     # now context and context equation mappings are full
     # validate contexts and context equation mappings
@@ -41,7 +42,7 @@ function validate()::Bool
 end
 
 
-function createModelVariations(inProgram::MKAbsyn.Program, context_equation_dict::Dict{Class,List{ContextEquationSection}}, context_dict::Dict{CLASS,List{Context}})::String
+function createModelVariations(inProgram::MKAbsyn.Program, context_equation_dict::Dict{Class,List{ContextEquationSystem}}, context_dict::Dict{Class,List{ContextDeclaration}})::String
     out = list()
     for class in inProgram.classes
         if isa(class.restriction, MKAbsyn.Restriction.R_CLASS)
@@ -54,7 +55,7 @@ function createModelVariations(inProgram::MKAbsyn.Program, context_equation_dict
 
 end
 
-function createModelVariation(inClass::MKAbsyn.Class, context_equation_sections::List{ContextEquationSection}, contexts::List{Context})::String
+function createModelVariation(inClass::MKAbsyn.Class, context_equation_sections::List{ContextEquationSystem}, contexts::List{ContextDeclaration})::String
 
     if isempty(contexts) || isempty(context_equation_sections)
         return MKAbsynProgramTraverser().translateClass(class)
@@ -109,7 +110,7 @@ function createModelVariation(inClass::MKAbsyn.Class, context_equation_sections:
 
 end
 
-function getEquationItemsForContext(context_equation_sections::List{ContextEquationSection}, context::Context)::List{EquationItem}
+function getEquationItemsForContext(context_equation_sections::List{ContextEquationSystem}, context::ContextDeclaration)::List{EquationItem}
     for context_equation_section in context_equation_sections
         if context_equation_section.label == context.label
             return context_equation_section.contents
