@@ -35,7 +35,7 @@ function generateCodeFromMKAbsyn(inProgram::MKAbsyn.Program)::String
     a = translateProgram(helper, inProgram)
 
     #TODO: remove this
-    mockContextDeclarations(helper, ListUtil.first(inProgram.classes))
+    # mockContextDeclarations(helper, ListUtil.first(inProgram.classes))
 
 
     println("=======TRANSLATED PROGRAM==========")
@@ -220,6 +220,7 @@ function replaceEquationsInClassParts(classParts::List{ClassPart}, equationItems
     for classPart in classParts
         @match classPart begin
             MKAbsyn.EQUATIONS(__) => begin end
+            MKAbsyn.CONTEXTDEFINITIONSECTION(__) => begin end
             MKAbsyn.CONTEXTEQUATIONS(__) => begin end
             _ => begin
                 # keep all other classParts

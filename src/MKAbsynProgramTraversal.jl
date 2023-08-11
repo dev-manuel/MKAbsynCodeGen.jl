@@ -169,7 +169,10 @@ function translateClassPart(self::MKAbsynProgramTraverser, inClassPart::MKAbsyn.
         ) => translateContextEquations(self, cLabel, cEquationContents, inClass)
         CONTEXTDEFINITIONSECTION(
             contents=cContextDefinitions,
-        ) => foreach(c -> translateContextDefinition(self, c, inClass), cContextDefinitions)
+        ) => begin
+            foreach(c -> translateContextDefinition(self, c, inClass), cContextDefinitions)
+            ""
+        end
 
         #TODO: OTHERS 
     end
