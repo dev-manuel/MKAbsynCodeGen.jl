@@ -342,6 +342,11 @@ function translateExpression(self::MKAbsynProgramTraverser, exp::Exp)
         ) => begin
             String(eValue)
         end
+        MKAbsyn.BOOL(
+            value=eValue
+        ) => begin
+            String(eValue)
+        end
         MKAbsyn.STRING(
             value=eValue
         ) => begin
@@ -396,6 +401,7 @@ function translateBinaryOperator(self::MKAbsynProgramTraverser, operator::MKAbsy
         MKAbsyn.GREATEREQ() => ">="
         MKAbsyn.AND() => "and"
         MKAbsyn.OR() => "or"
+        MKAbsyn.EQUAL() => "=="
 
     end
 end
