@@ -364,9 +364,17 @@ function translateExpression(self::MKAbsynProgramTraverser, exp::Exp)
             op=eOp,
             exp2=eExp2
         ) => begin
-            translateExpression(self, eExp1) + " " + translateBinaryOperator(self, eOp) + " " + translateExpression(self, eExp2)
+            "(" + translateExpression(self, eExp1) + " " + translateBinaryOperator(self, eOp) + " " + translateExpression(self, eExp2) + ")"
         end
         MKAbsyn.RELATION(
+            exp1=eExp1,
+            op=eOp,
+            exp2=eExp2
+        ) => begin
+            translateExpression(self, eExp1) + " " + translateBinaryOperator(self, eOp) + " " + translateExpression(self, eExp2)
+        end
+
+        MKAbsyn.LBINARY(
             exp1=eExp1,
             op=eOp,
             exp2=eExp2
@@ -386,6 +394,8 @@ function translateBinaryOperator(self::MKAbsynProgramTraverser, operator::MKAbsy
         MKAbsyn.LESSEQ() => "<="
         MKAbsyn.GREATER() => ">"
         MKAbsyn.GREATEREQ() => ">="
+        MKAbsyn.AND() => "and"
+        MKAbsyn.OR() => "or"
 
     end
 end
@@ -412,6 +422,14 @@ function translateComponentRef(self::MKAbsynProgramTraverser, componentRef::MKAb
         ) => begin
             cName
         end
+        MKAbsyn.CREF_QUAL(
+            name=cName,
+            subscripts=cSubscripts,
+            componentRef=cComponentRef
+        ) => begin
+            cName + "." + translateComponentRef(self, cComponentRef)
+        end
+
     end
 end
 

@@ -121,22 +121,36 @@ function createModelVariation(inClass::MKAbsyn.Class, context_equation_sections:
 
     # variations
     contextDict = Dict()
+    defaultContextExists = false
     for context in contexts
         equationItems::List{EquationItem} = getEquationItemsForContext(context_equation_sections, context)
         if equationItems == nil
             #TODO: handle case
-            continue
         end
-        model_id = inClass.name + "_" + uppercasefirst(context.label)
+        println("creating context class for " + context.label)
+        isDefaultContext = cmp(context.label, "initial") == 0
+
+        if isDefaultContext
+            println("found initial context")
+            model_id = initialClassName
+            subClass = initialSubClass
+            defaultContextExists = true
+        else
+            model_id = inClass.name + "_" + uppercasefirst(context.label)
+            subClass = instantiateClassVariant(inClass, model_id, equationItems)
+        end
         contextDict[model_id] = context.condition
 
-        subClass = instantiateClassVariant(inClass, model_id, equationItems)
-        push!(models, translateClass(MKAbsynProgramTraverser(), subClass))
+        if !isDefaultContext
+            push!(models, translateClass(MKAbsynProgramTraverser(), subClass))
+        end
     end
 
     # add structural mode declarations for initial and contexts
-    out += "structuralMode " + initialClassName + " " + createInstanceName(initialClassName) + ";\n"
-    out += join(map(x -> "structuralMode " + x + " " + createInstanceName(x) + ";\n", collect(keys(contextDict))), "")
+    if !defaultContextExists
+        out += "structuralmode " + initialClassName + " " + createInstanceName(initialClassName) + ";\n"
+    end
+    out += join(map(x -> "structuralmode " + x + " " + createInstanceName(x) + ";\n", collect(keys(contextDict))), "")
 
     # add sub models
     out += join(models, "\n") + "\n"
@@ -148,11 +162,28 @@ function createModelVariation(inClass::MKAbsyn.Class, context_equation_sections:
     out += "initialStructuralState(" + createInstanceName(initialClassName) + ");\n"
 
     # add transitions
-    for (from_context, _) in pairs(contextDict)
-        for (to_context, condition) in pairs(contextDict)
-            if from_context == to_context
+    for (to_context, condition) in pairs(contextDict)
+
+
+        # if to_context is default: we don't need to go from initial to initial
+        if cmp(to_context, initialClassName) !== 0
+            out += "structuralTransition(" + createInstanceName(initialClassName) + ", " + createInstanceName(to_context) + ", " + translateExpression(MKAbsynProgramTraverser(), condition) + ");\n"
+        end
+
+        for (from_context, _) in pairs(contextDict)
+            println("==== NEW TO CONTEXT PAIR ====")
+            println("checking " + from_context + " -> " + to_context)
+            if cmp(from_context, initialClassName) == 0
+                # no need for another transition from inital to current to_context
+                println("skipping because initial context already there")
                 continue
             end
+
+            if cmp(from_context, to_context) == 0
+                println("skipping because equal contexts")
+                continue
+            end
+            println("adding transition")
             out += "structuralTransition(" + createInstanceName(from_context) + ", " + createInstanceName(to_context) + ", " + translateExpression(MKAbsynProgramTraverser(), condition) + ");\n"
         end
     end
