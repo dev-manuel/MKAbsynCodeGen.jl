@@ -326,6 +326,13 @@ function translateEquation(self::MKAbsynProgramTraverser, equation::MKAbsyn.Equa
         ) => begin
             translateExpression(self, eLeftSide) + " = " + translateExpression(self, eRightSide)
         end
+        MKAbsyn.EQ_WHEN_E(
+            whenExp=eWhenExp,
+            whenEquations=eWhenEquations,
+            elseWhenEquations=eElseWhenEquations
+        ) => begin
+            "when " + translateExpression(self, eWhenExp) + " then\n" + bundleElementsFromIterator((translateEquationItem(self, c) for c in eWhenEquations), true) + "\nelse\n" + bundleElementsFromIterator((translateEquationItem(self, c) for c in eElseWhenEquations), true) + "\nend when"
+        end
 
     end
 end
