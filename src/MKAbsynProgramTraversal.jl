@@ -112,11 +112,12 @@ function translateClass(self::MKAbsynProgramTraverser, inClass::MKAbsyn.Class)::
             body=cBody,
             info=cInfo,
         ) => begin
-            classDef = translateClassDef(self, cBody, cInfo, cRestriction, inClass)
+            classDef = translateClassDef(self, cBody, inClass)
             restStr = begin
                 @match cRestriction begin
                     MKAbsyn.R_MODEL() => "model"
                     MKAbsyn.R_CLASS() => "class"
+                    MKAbsyn.R_PACKAGE() => "package"
                 end
             end
             restStr + " " + cName + "\n" + classDef + "\n" + "end " + cName + ";"
@@ -127,8 +128,6 @@ end
 function translateClassDef(
     self::MKAbsynProgramTraverser,
     inClassDef::MKAbsyn.ClassDef,
-    info::MKAbsyn.SourceInfo,
-    re::MKAbsyn.Restriction,
     inClass::MKAbsyn.Class
 )::String
     local dClassParts::List{MKAbsyn.ClassPart}
@@ -265,6 +264,12 @@ function translateElementSpec(self::MKAbsynProgramTraverser, elementSpec::MKAbsy
             components=eComponents
         ) => begin
             translateTypeSpec(self, eTypeSpec) + " " + join((translateComponentItem(self, c) for c in eComponents), ", ")
+        end
+        MKAbsyn.CLASSDEF(
+            replaceable_=eReplaceable,
+            class_=eClass,
+        ) => begin
+            translateClass(self, eClass)
         end
     end
 end

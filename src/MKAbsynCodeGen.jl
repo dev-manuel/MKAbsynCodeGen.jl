@@ -18,23 +18,15 @@ const INITIAL_SUB_CLASS_NAME = "Context_Initial"
 
 
 function generateCodeFromMKAbsyn(inProgram::MKAbsyn.Program)::String
-    helper = MKAbsynProgramTraverser()
-    resetState(helper)
-    translateProgram(helper, inProgram)
-
-    # println("=======TRANSLATED PROGRAM==========")
-    # println(a)
-    # println("===================================")
-    context_dict::Dict{Class,List{ContextDeclaration}} = helper.context_dict
-    context_equation_dict::Dict{Class,List{ContextEquationSystem}} = helper.context_equation_dict
 
     # now context and context equation mappings are full
     # validate contexts and context equation mappings
-    if !validate(context_equation_dict, context_dict)
-        @error "Contexts not valid"
-    end
+    return generateCodeFromClassList(inProgram.classes)
+end
 
-    createModelVariations(inProgram, context_equation_dict, context_dict)
+function generateCodeFromClassList(classList::List{Class})::String
+    out = (createModelVariations(class) for class in classList)
+    join(out, "\n")
 end
 
 function validate(context_equation_dict::Dict{Class,List{ContextEquationSystem}}, context_dict::Dict{Class,List{ContextDeclaration}})::Bool
@@ -45,24 +37,132 @@ function validate(context_equation_dict::Dict{Class,List{ContextEquationSystem}}
 end
 
 
-function createModelVariations(inProgram::MKAbsyn.Program, context_equation_dict::Dict{Class,List{ContextEquationSystem}}, context_dict::Dict{Class,List{ContextDeclaration}})::String
-    out = []
-    for class in inProgram.classes
-        @match class.restriction begin
-            MKAbsyn.R_CLASS() => begin
-                push!(out, translateClass(MKAbsynProgramTraverser(), class))
+function createModelVariations(class::MKAbsyn.Class)::String
+
+
+    @match class.restriction begin
+        MKAbsyn.R_CLASS() => begin
+            return translateClass(MKAbsynProgramTraverser(), class)
+        end
+        MKAbsyn.R_MODEL() => begin
+            helper = MKAbsynProgramTraverser()
+            resetState(helper)
+
+            # getting the contexts (just for traversal - actual translation of programm is ignored)
+            translateClass(helper, class)
+
+            # println("=======TRANSLATED PROGRAM==========")
+            # println(a)
+            # println("===================================")
+            context_dict::Dict{Class,List{ContextDeclaration}} = helper.context_dict
+            context_equation_dict::Dict{Class,List{ContextEquationSystem}} = helper.context_equation_dict
+
+            if isempty(context_dict)
+                println("no context or context equation sections for " + class.name + " -> skipping variationing")
+                return translateClass(MKAbsynProgramTraverser(), class)
             end
-            MKAbsyn.R_MODEL() => begin
-                if isempty(context_dict)
-                    println("no context or context equation sections for " + inClass.name + " -> skipping variationing")
-                    push!(out, translateClass(MKAbsynProgramTraverser(), class))
-                end
-                push!(out, createModelVariation(class, context_equation_dict[class], context_dict[class]))
+
+            if !validate(context_equation_dict, context_dict)
+                @error "Contexts not valid"
             end
+
+            return createModelVariation(class, context_equation_dict[class], context_dict[class])
+        end
+        MKAbsyn.R_PACKAGE() => begin
+            return handlePackage(class)
         end
     end
-    join(out, "\n")
 
+
+end
+
+function handlePackage(class::Class)::String
+    # println(class + "\n\n")
+    # return = generateCodeFromClassList(Cons{Class}(class, list()))
+
+    # iterate over class parts
+    classDef = class.body
+    out = nil
+    @match classDef begin
+        # PARTS
+        MKAbsyn.PARTS(
+            #typeVars=typeVars,
+            #classAttrs=classAttrs,
+            classParts=dClassParts,
+            #ann=ann,
+            #comment=cmtString,
+        ) => begin
+            # classes = list()
+            classes = list()
+            for classPart in dClassParts
+                # extract element items from class part
+                elementItems = @match classPart begin
+                    MKAbsyn.PUBLIC(
+                        contents=cElementContents
+                    ) => cElementContents
+                    MKAbsyn.PROTECTED(
+                        contents=cElementContents
+                    ) => cElementContents
+                    _ => return list()
+                end
+                # search for classes
+                for elementItem in elementItems
+                    curClass = findClassInElementItem(elementItem)
+                    if !isnothing(curClass)
+                        # classes = ListUtil.append_reverse(classes, ListUtil.create(curClass))
+                        classes = ListUtil.append_reverse(classes, Cons{Class}(curClass, list()))
+                    end
+                end
+
+
+            end
+            out = generateCodeFromClassList(classes)
+        end
+        _ => begin
+
+            out = ""
+        end
+
+    end
+    if out == ""
+        return out
+    end
+    # get all classes in PARTS -> ClassPart --> ElementItem -> ELEMENT -> CLASSDEF
+    # call createModelVariations with each class
+    # return joined string
+    return "package " + class.name + "\n" + out + "\nend " + class.name + ";\n"
+end
+
+function findClassInElementItem(elementItem::ElementItem)::Union{Class,Nothing}
+    return @match elementItem begin
+        MKAbsyn.ELEMENTITEM(
+            element=eElement
+        ) => findClassInElement(eElement)
+        _ => nothing
+
+    end
+end
+
+function findClassInElement(element::Element)::Union{Class,Nothing}
+    return @match element begin
+        MKAbsyn.ELEMENT(
+            specification=eSpec
+        ) => findClassInElementSpec(eSpec)
+        _ => nothing
+
+    end
+end
+
+
+function findClassInElementSpec(element::ElementSpec)::Union{Class,Nothing}
+    # TODO: convert CLASS to class 
+    return @match element begin
+        MKAbsyn.CLASSDEF(
+            class_=eClass
+        ) => eClass
+        _ => nothing
+
+    end
 end
 
 function createInstanceName(contextName::String)::String
