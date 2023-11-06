@@ -263,7 +263,7 @@ function translateElementSpec(self::MKAbsynProgramTraverser, elementSpec::MKAbsy
             typeSpec=eTypeSpec,
             components=eComponents
         ) => begin
-            translateTypeSpec(self, eTypeSpec) + " " + join((translateComponentItem(self, c) for c in eComponents), ", ")
+            translateElementAttributes(self, eAttributes) + translateTypeSpec(self, eTypeSpec) + " " + join((translateComponentItem(self, c) for c in eComponents), ", ")
         end
         MKAbsyn.CLASSDEF(
             replaceable_=eReplaceable,
@@ -271,6 +271,33 @@ function translateElementSpec(self::MKAbsynProgramTraverser, elementSpec::MKAbsy
         ) => begin
             translateClass(self, eClass)
         end
+    end
+end
+
+function translateElementAttributes(self::MKAbsynProgramTraverser, attributes::MKAbsyn.ElementAttributes)
+    @match attributes begin
+        MKAbsyn.ATTR(
+            flowPrefix=aFlowPrefix,
+            streamPrefix=aStreamPrefix,
+            parallelism=aParallelism,
+            variability=aVariability,
+            direction=aDirection,
+            isField=aIsField,
+            arrayDim=aArrayDim,
+            isMode=aIsMode
+        ) => begin
+            translateVariability(self, aVariability)
+        end
+    end
+
+end
+
+function translateVariability(self::MKAbsynProgramTraverser, variability::Variability)
+    @match variability begin
+        MKAbsyn.PARAM() => begin
+            "parameter "
+        end
+        _ => ""
     end
 end
 
@@ -314,7 +341,62 @@ function translateComponent(self::MKAbsynProgramTraverser, component::MKAbsyn.Co
             arrayDim=cArrayDim,
             modification=cModification
         ) => begin
-            cName
+            cName + translateModificationOption(self, cModification)
+
+        end
+    end
+end
+
+function translateModificationOption(self::MKAbsynProgramTraverser, modification::Option{MKAbsyn.Modification})::String
+    @match modification begin
+        SOME(mod) => begin
+            translateModification(self, mod)
+        end
+        _ => begin
+            ""
+        end
+    end
+end
+
+function translateModification(self::MKAbsynProgramTraverser, modification::MKAbsyn.Modification)::String
+    @match modification begin
+        MKAbsyn.CLASSMOD(
+            elementArgLst=mElementArgLst,
+            eqMod=mEqMod
+        ) => begin
+            join((translateElementArg(self, ea) for ea in mElementArgLst), " ")translateEqMod(self, mEqMod)
+        end
+    end
+end
+
+function translateElementArg(self::MKAbsynProgramTraverser, elementArg::MKAbsyn.ElementArg)::String
+    @match elementArg begin
+        MKAbsyn.MODIFICATION(
+            finalPrefix=eFinalPrefix,
+            eachPrefix=eEachPrefix,
+            path=ePath,
+            modification=eModification,
+            comment=eComment,
+            info=eInfo
+        ) => begin
+            return "(" + translatePath(self, ePath) + translateModificationOption(self, eModification) + ")"
+        end
+    end
+end
+
+
+
+function translateEqMod(self::MKAbsynProgramTraverser, eqMod::MKAbsyn.EqMod)::String
+    @match eqMod begin
+        MKAbsyn.NOMOD(
+        ) => begin
+            ""
+        end
+        MKAbsyn.EQMOD(
+            exp=eExp,
+            info=eInfo
+        ) => begin
+            "=" + translateExpression(self, eExp)
         end
     end
 end
