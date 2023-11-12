@@ -169,28 +169,39 @@ function createInstanceName(contextName::String)::String
     lowercasefirst(contextName) + "_instance"
 end
 
-function getAllPublicSectionsFromClass(inClass::MKAbsyn.Class)
-    cClassParts = @match inClass.body begin
-        MKAbsyn.PARTS(classParts=cClassParts) => cClassParts
-        MKAbsyn.CLASS_EXTENDS(parts=cClassParts) => cClassParts
-        _ => []
+function getPrivateElementItemsFromClass(inClass::MKAbsyn.Class)
+    println("investigating all private elements of " + inClass.name)
+    classParts = list()
+    @match inClass.body begin
+        MKAbsyn.PARTS(classParts=cClassParts) => begin
+            classParts = cClassParts
+        end
+        MKAbsyn.CLASS_EXTENDS(parts=cClassParts) => begin
+            classParts = cClassParts
+        end
+        _ => begin end
     end
-    out = []
-    for element in cClassParts
-        if classPartIsPublic(element)
-            push!(out, element)
+    out = list()
+    println("==============================")
+    println(classParts)
+    for element in classParts
+        @match element begin
+            MKAbsyn.PRIVATE(
+                contents=cElementContents
+            ) => begin
+                println("============found private element")
+                println(cElementContents)
+                out = ListUtil.append_reverse(out, cElementContents)
+                println("============new out")
+                println(out)
+            end
+            _ => begin end
         end
     end
     # out = filter(classPartIsPublic, cClassParts)
+    println("==============================")
+    println(out)
     return out
-end
-
-
-function classPartIsPublic(classPart::ClassPart)
-    return @match classPart begin
-        MKAbsyn.PUBLIC(__) => true
-        _ => false
-    end
 end
 
 function getEquationItemsFromClass(inClass::MKAbsyn.Class)::List{EquationItem}
@@ -302,8 +313,11 @@ function createModelVariation(inClass::MKAbsyn.Class, context_equation_sections:
     # adding structuralmode header
     out += join(map(x -> "structuralmode " + x + " " + createInstanceName(x) + ";\n", collect(keys(contextDict))), "")
 
-    # add variables from public
-    out += join(map(x -> translateClassPart(MKAbsynProgramTraverser(), x, inClass), getAllPublicSectionsFromClass(inClass)), "\n") + "\n"
+    # add variables from PRIVATE section(s)
+    # out += join(map(x -> translateClassPart(MKAbsynProgramTraverser(), x, inClass), getPrivateElementItemsFromClass(inClass)), "\n") + "\n"
+    out += bundleElementsFromIterator((translateElementItem(MKAbsynProgramTraverser(), c) for c in getPrivateElementItemsFromClass(inClass)), true)
+    println("\n\n---class---", inClass, "\n\n")
+    println("\n\n---private---", getPrivateElementItemsFromClass(inClass), "\n\n")
 
     # add sub models
     out += join(models, "\n") + "\n"
