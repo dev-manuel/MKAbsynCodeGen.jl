@@ -169,40 +169,6 @@ function createInstanceName(contextName::String)::String
     lowercasefirst(contextName) + "_instance"
 end
 
-function getPrivateElementItemsFromClass(inClass::MKAbsyn.Class)
-    println("investigating all private elements of " + inClass.name)
-    classParts = list()
-    @match inClass.body begin
-        MKAbsyn.PARTS(classParts=cClassParts) => begin
-            classParts = cClassParts
-        end
-        MKAbsyn.CLASS_EXTENDS(parts=cClassParts) => begin
-            classParts = cClassParts
-        end
-        _ => begin end
-    end
-    out = list()
-    println("==============================")
-    println(classParts)
-    for element in classParts
-        @match element begin
-            MKAbsyn.PRIVATE(
-                contents=cElementContents
-            ) => begin
-                println("============found private element")
-                println(cElementContents)
-                out = ListUtil.append_reverse(out, cElementContents)
-                println("============new out")
-                println(out)
-            end
-            _ => begin end
-        end
-    end
-    # out = filter(classPartIsPublic, cClassParts)
-    println("==============================")
-    println(out)
-    return out
-end
 
 function getEquationItemsFromClass(inClass::MKAbsyn.Class)::List{EquationItem}
 
@@ -270,15 +236,16 @@ function createModelVariation(inClass::MKAbsyn.Class, context_equation_sections:
 
 
     # create model list for each context
-    models = []
+    
 
     # initial  model can be translated without any changes
     initialClassName = inClass.name + "__" + INITIAL_SUB_CLASS_NAME
     #initialSubClass = instantiateClassVariant(inClass, initialClassName, list())
     #push!(models, translateClass(MKAbsynProgramTraverser(), initialSubClass))
 
-    # variations
+    # creating the dict mapping contexts to their condition and the list of models
     contextDict = Dict()
+    models = []
     defaultContextExists = false
     for context in contexts
         equationItems::List{EquationItem} = getEquationItemsForContext(context_equation_sections, context)
@@ -303,9 +270,8 @@ function createModelVariation(inClass::MKAbsyn.Class, context_equation_sections:
         push!(models, translateClass(MKAbsynProgramTraverser(), subClass))
     end
 
-    # add structural mode declarations for initial and contexts
+    # check if initial context exists
     if !defaultContextExists
-        # out += "structuralmode " + initialClassName + " " + createInstanceName(initialClassName) + ";\n"
         throw(ArgumentError("No initial context found"))
     end
 
@@ -313,11 +279,16 @@ function createModelVariation(inClass::MKAbsyn.Class, context_equation_sections:
     # adding structuralmode header
     out += join(map(x -> "structuralmode " + x + " " + createInstanceName(x) + ";\n", collect(keys(contextDict))), "")
 
-    # add variables from PRIVATE section(s)
-    # out += join(map(x -> translateClassPart(MKAbsynProgramTraverser(), x, inClass), getPrivateElementItemsFromClass(inClass)), "\n") + "\n"
-    out += bundleElementsFromIterator((translateElementItem(MKAbsynProgramTraverser(), c) for c in getPrivateElementItemsFromClass(inClass)), true)
+
+
+
+
+    # add everything except equations
+    out += bundleElementsFromIterator((translateClassPart(MKAbsynProgramTraverser(), c, inClass) for c in getAllClassPartsExceptEquationsFromClassDef(inClass.body)))
+    println("CALL END")
     println("\n\n---class---", inClass, "\n\n")
-    println("\n\n---private---", getPrivateElementItemsFromClass(inClass), "\n\n")
+
+
 
     # add sub models
     out += join(models, "\n") + "\n"
@@ -325,6 +296,15 @@ function createModelVariation(inClass::MKAbsyn.Class, context_equation_sections:
     # add new equation section
     out += "equation\n"
     out += bundleElementsFromIterator((translateEquationItem(MKAbsynProgramTraverser(), c) for c in getEquationItemsFromClass(inClass)), true) + "\n"
+
+
+
+
+
+
+
+
+    
 
     # add initialStructureMode
     out += "initialStructuralState(" + createInstanceName(initialClassName) + ");\n"
@@ -377,8 +357,8 @@ function instantiateClassVariant(originalClass::Class, name::String, equationIte
 
     newClassDef = originalClass.body
     if !isnothing(equationItems) && !isempty(equationItems)
-        # remove all EQUATIONS from curClass.body
-        newClassDef = replaceEquationsInClassDef(originalClass.body, equationItems)
+        # replace all EQUATIONS from curClass.body
+        newClassDef = replaceAndIsolateEquationsInClassDef(originalClass.body, equationItems)
     end
 
 
@@ -390,7 +370,7 @@ function instantiateClassVariant(originalClass::Class, name::String, equationIte
 
 end
 
-function replaceEquationsInClassDef(classDef::ClassDef, equationItems::List{EquationItem})::ClassDef
+function replaceAndIsolateEquationsInClassDef(classDef::ClassDef, equationItems::List{EquationItem})::ClassDef
     @match classDef begin
         MKAbsyn.PARTS(
             typeVars=cTypeVars,
@@ -399,7 +379,7 @@ function replaceEquationsInClassDef(classDef::ClassDef, equationItems::List{Equa
             ann=cAnn,
             comment=cComment
         ) => begin
-            MKAbsyn.PARTS(cTypeVars, cAttrs, replaceEquationsInClassParts(cParts, equationItems), cAnn, cComment)
+            MKAbsyn.PARTS(cTypeVars, cAttrs, generateClassPartListFromEquationItems(equationItems), cAnn, cComment)
         end
         MKAbsyn.CLASS_EXTENDS(
             baseClassName=cBaseClassName,
@@ -408,13 +388,42 @@ function replaceEquationsInClassDef(classDef::ClassDef, equationItems::List{Equa
             parts=cParts,
             ann=cAnn
         ) => begin
-            MKAbsyn.CLASS_EXTENDS(cBaseClassName, cModifications, cComment, replaceEquationsInClassParts(cParts, equationItems), cAnn)
+            MKAbsyn.CLASS_EXTENDS(cBaseClassName, cModifications, cComment, generateClassPartListFromEquationItems(equationItems), cAnn)
         end
     end
 end
 
 
-function replaceEquationsInClassParts(classParts::List{ClassPart}, equationItems::List{EquationItem})::List{ClassPart}
+function generateClassPartListFromEquationItems(equationItems::List{EquationItem})::List{ClassPart}
+    ListUtil.create(convert(ClassPart, MKAbsyn.EQUATIONS(equationItems)))
+end
+
+
+
+function getAllClassPartsExceptEquationsFromClassDef(classDef::ClassDef)::List{ClassPart}
+    @match classDef begin
+        MKAbsyn.PARTS(
+            typeVars=cTypeVars,
+            classAttrs=cAttrs,
+            classParts=cParts,
+            ann=cAnn,
+            comment=cComment
+        ) => begin
+            getAllClassPartsExceptEquationsFromClassParts(cParts)
+        end
+        MKAbsyn.CLASS_EXTENDS(
+            baseClassName=cBaseClassName,
+            modifications=cModifications,
+            comment=cComment,
+            parts=cParts,
+            ann=cAnn
+        ) => begin
+            getAllClassPartsExceptEquationsFromClassParts(cParts)
+        end
+    end
+end
+
+function getAllClassPartsExceptEquationsFromClassParts(classParts::List{ClassPart})::List{ClassPart}
     out::List{ClassPart} = list()
     for classPart in classParts
         @match classPart begin
@@ -427,11 +436,9 @@ function replaceEquationsInClassParts(classParts::List{ClassPart}, equationItems
             end
         end
     end
-    a::ClassPart = convert(ClassPart, MKAbsyn.EQUATIONS(equationItems))
-    l::List{ClassPart} = ListUtil.create(a)
-    out = ListUtil.append_reverse(out, l)
     out
 
 end
+
 
 end

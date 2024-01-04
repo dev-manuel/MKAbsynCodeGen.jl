@@ -51,7 +51,7 @@ const ASSERTION_LEVEL_ERROR =
 
 # can be used a la bundleElementsFromIterator(c for c in [1,2,3])
 function bundleElementsFromIterator(iter::Base.Generator, useSemicolon::Bool=false)::String
-    join(map(a -> a + (useSemicolon ? ";" : ""), list(iter)), "\n") + "\n"
+    join(map(a -> !isnothing(a) && !isempty(a) ? a + (useSemicolon ? ";" : "") : "", list(iter)), "\n") + "\n"
 end
 
 mutable struct ContextDeclaration
@@ -162,9 +162,6 @@ function translateClassPart(self::MKAbsynProgramTraverser, inClassPart::MKAbsyn.
         MKAbsyn.PUBLIC(
             contents=cElementContents
         ) => bundleElementsFromIterator((translateElementItem(self, c) for c in cElementContents), true)
-        MKAbsyn.PRIVATE(
-            contents=cElementContents
-        ) => ""
         MKAbsyn.CONTEXTEQUATIONS(
             label=cLabel,
             contents=cEquationContents
