@@ -463,14 +463,20 @@ function translateExpression(self::MKAbsynProgramTraverser, exp::Exp)
             op=eOp,
             exp2=eExp2
         ) => begin
-            "(" + translateExpression(self, eExp1) + " " + translateBinaryOperator(self, eOp) + " " + translateExpression(self, eExp2) + ")"
+            "(" + translateExpression(self, eExp1) + " " + translateOperator(self, eOp) + " " + translateExpression(self, eExp2) + ")"
+        end
+        MKAbsyn.UNARY(
+            op=eOp,
+            exp=eExp,
+        ) => begin
+            "(" + translateOperator(self, eOp) + translateExpression(self, eExp) + ")"
         end
         MKAbsyn.RELATION(
             exp1=eExp1,
             op=eOp,
             exp2=eExp2
         ) => begin
-            translateExpression(self, eExp1) + " " + translateBinaryOperator(self, eOp) + " " + translateExpression(self, eExp2)
+            translateExpression(self, eExp1) + " " + translateOperator(self, eOp) + " " + translateExpression(self, eExp2)
         end
 
         MKAbsyn.LBINARY(
@@ -478,15 +484,16 @@ function translateExpression(self::MKAbsynProgramTraverser, exp::Exp)
             op=eOp,
             exp2=eExp2
         ) => begin
-            translateExpression(self, eExp1) + " " + translateBinaryOperator(self, eOp) + " " + translateExpression(self, eExp2)
+            translateExpression(self, eExp1) + " " + translateOperator(self, eOp) + " " + translateExpression(self, eExp2)
         end
     end
 end
 
-function translateBinaryOperator(self::MKAbsynProgramTraverser, operator::MKAbsyn.Operator)::String
+function translateOperator(self::MKAbsynProgramTraverser, operator::MKAbsyn.Operator)::String
     @match operator begin
         MKAbsyn.ADD() => "+"
         MKAbsyn.SUB() => "-"
+        MKAbsyn.UMINUS() => "-"
         MKAbsyn.MUL() => "*"
         MKAbsyn.DIV() => "/"
         MKAbsyn.LESS() => "<"
@@ -496,6 +503,7 @@ function translateBinaryOperator(self::MKAbsynProgramTraverser, operator::MKAbsy
         MKAbsyn.AND() => "and"
         MKAbsyn.OR() => "or"
         MKAbsyn.EQUAL() => "=="
+        MKAbsyn.POW() => "^"
 
     end
 end

@@ -246,9 +246,9 @@ function createModelVariation(inClass::MKAbsyn.Class, context_equation_sections:
     # creating the dict mapping contexts to their condition and the list of models
     contextDict = Dict()
     models = []
-    defaultContextExists = false
+    initialContextIncludesCondition = false
     for context in contexts
-        equationItems::List{EquationItem} = getEquationItemsForContext(context_equation_sections, context)
+        equationItems::List{EquationItem} = getEquationItemsForContext(context_equation_sections, context.label)
         if equationItems == nil
             #TODO: handle case
             #continue
@@ -259,7 +259,7 @@ function createModelVariation(inClass::MKAbsyn.Class, context_equation_sections:
         if isDefaultContext
             println("found initial context")
             model_id = initialClassName
-            defaultContextExists = true
+            initialContextIncludesCondition = true
         else
             model_id = inClass.name + "_" + uppercasefirst(context.label)
 
@@ -270,10 +270,20 @@ function createModelVariation(inClass::MKAbsyn.Class, context_equation_sections:
         push!(models, translateClass(MKAbsynProgramTraverser(), subClass))
     end
 
-    # check if initial context exists
-    if !defaultContextExists
-        throw(ArgumentError("No initial context found"))
+    if (!initialContextIncludesCondition)
+        println("no initial context found -> creating default context")
+        # create default context
+        initial_equations = getEquationItemsForContext(context_equation_sections, "initial")
+        if context_equation_sections==nil
+            throw(ArgumentError("No initial context found"))
+        end
+        subClass = instantiateClassVariant(inClass, initialClassName,initial_equations )
+        push!(models, translateClass(MKAbsynProgramTraverser(), subClass))
+        out += "structuralmode " + initialClassName + " " + createInstanceName(initialClassName) + ";\n"
     end
+
+    # check if initial context exists
+
 
 
     # adding structuralmode header
@@ -285,8 +295,6 @@ function createModelVariation(inClass::MKAbsyn.Class, context_equation_sections:
 
     # add everything except equations
     out += bundleElementsFromIterator((translateClassPart(MKAbsynProgramTraverser(), c, inClass) for c in getAllClassPartsExceptEquationsFromClassDef(inClass.body)))
-    println("CALL END")
-    println("\n\n---class---", inClass, "\n\n")
 
 
 
@@ -297,14 +305,6 @@ function createModelVariation(inClass::MKAbsyn.Class, context_equation_sections:
     out += "equation\n"
     out += bundleElementsFromIterator((translateEquationItem(MKAbsynProgramTraverser(), c) for c in getEquationItemsFromClass(inClass)), true) + "\n"
 
-
-
-
-
-
-
-
-    
 
     # add initialStructureMode
     out += "initialStructuralState(" + createInstanceName(initialClassName) + ");\n"
@@ -321,6 +321,10 @@ function createModelVariation(inClass::MKAbsyn.Class, context_equation_sections:
         for (from_context, _) in pairs(contextDict)
             println("==== NEW TO CONTEXT PAIR ====")
             println("checking " + from_context + " -> " + to_context)
+            if (!initialContextIncludesCondition)
+                out += "structuralTransition(" + initialClassName + ", " + createInstanceName(to_context) + ", " + translateExpression(MKAbsynProgramTraverser(), condition) + ");\n"
+            end
+            
             if cmp(from_context, to_context) == 0
                 println("skipping because equal contexts")
                 continue
@@ -331,6 +335,7 @@ function createModelVariation(inClass::MKAbsyn.Class, context_equation_sections:
             #     println("skipping because initial context already there")
             #     continue
             # end
+
             println("adding transition")
             out += "structuralTransition(" + createInstanceName(from_context) + ", " + createInstanceName(to_context) + ", " + translateExpression(MKAbsynProgramTraverser(), condition) + ");\n"
         end
@@ -341,9 +346,9 @@ function createModelVariation(inClass::MKAbsyn.Class, context_equation_sections:
     out
 end
 
-function getEquationItemsForContext(context_equation_sections::List{ContextEquationSystem}, context::ContextDeclaration)::List{EquationItem}
+function getEquationItemsForContext(context_equation_sections::List{ContextEquationSystem}, context_label::String)::List{EquationItem}
     for context_equation_section in context_equation_sections
-        if context_equation_section.contextLabel == context.label
+        if context_equation_section.contextLabel == context_label
             return context_equation_section.equations
         end
     end
