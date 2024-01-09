@@ -322,9 +322,9 @@ function createModelVariation(inClass::MKAbsyn.Class, context_equation_sections:
             println("==== NEW TO CONTEXT PAIR ====")
             println("checking " + from_context + " -> " + to_context)
             if (!initialContextIncludesCondition)
-                out += "structuralTransition(" + initialClassName + ", " + createInstanceName(to_context) + ", " + translateExpression(MKAbsynProgramTraverser(), condition) + ");\n"
+                out += "structuralTransition(" + createInstanceName(initialClassName) + ", " + createInstanceName(to_context) + ", " + translateExpression(MKAbsynProgramTraverser(), condition) + ");\n"
             end
-            
+
             if cmp(from_context, to_context) == 0
                 println("skipping because equal contexts")
                 continue
