@@ -420,6 +420,22 @@ function translateEquation(self::MKAbsynProgramTraverser, equation::MKAbsyn.Equa
         ) => begin
             "when " + translateExpression(self, eWhenExp) + " then\n" + bundleElementsFromIterator((translateEquationItem(self, c) for c in eWhenEquations), true) + "\nelse\n" + bundleElementsFromIterator((translateEquationItem(self, c) for c in eElseWhenEquations), true) + "\nend when"
         end
+        MKAbsyn.EQ_IF(
+            ifExp=eIfExp,
+            equationTrueItems=eEquationTrueItems,
+            elseIfBranches=eElseIfBranches,
+            equationElseItems=eEquationElseItems
+        ) => begin
+            start = "if " + translateExpression(self, eIfExp) + " then\n" + bundleElementsFromIterator((translateEquationItem(self, c) for c in eEquationTrueItems), true)
+
+
+            # elseIf = "\nelse if \n" + bundleElementsFromIterator((translateEquationItem(self, c) for c in eElseWhenEquations), true)
+            elseIf = ""
+
+            elseAndEnd = "\nelse\n" + bundleElementsFromIterator((translateEquationItem(self, c) for c in eEquationElseItems), true) + "\nend if"
+
+            start + elseIf + elseAndEnd
+        end
 
     end
 end
